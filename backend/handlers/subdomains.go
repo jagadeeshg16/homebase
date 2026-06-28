@@ -119,13 +119,17 @@ func DeleteSubdomain(w http.ResponseWriter, r *http.Request) {
 	db.DB.QueryRow("SELECT name FROM subdomains WHERE id = ?", id).Scan(&name)
 	log.Printf("DELETE subdomain: id=%d name=%q", id, name)
 
+	db.DB.Exec("DELETE FROM health_logs WHERE subdomain_id = ?", id)
+	db.DB.Exec("DELETE FROM dns_events WHERE subdomain = ?", name)
+
 	res, err := db.DB.Exec("DELETE FROM subdomains WHERE id = ?", id)
 	if err != nil {
 		log.Printf("DELETE subdomain: db error: %v", err)
-	} else {
-		n, _ := res.RowsAffected()
-		log.Printf("DELETE subdomain: rows affected=%d", n)
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
 	}
+	n, _ := res.RowsAffected()
+	log.Printf("DELETE subdomain: rows affected=%d", n)
 
 	// delete DNS record via tracked event
 	if DNSProvider != nil && name != "" && config.C.RootDomain != "" {
