@@ -75,6 +75,12 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 
 		switch rec.Type {
 		case "proxy":
+			// browser implicit form submit (password field + button) sends POST /
+			// redirect to GET so the upstream app receives a normal page load
+			if r.Method == http.MethodPost && r.URL.Path == "/" {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
 			proxyTo(rec.ProxyURL, w, r)
 		default:
 			http.FileServer(http.Dir(fmt.Sprintf("%s/%s", sitesDir, name))).ServeHTTP(w, r)
