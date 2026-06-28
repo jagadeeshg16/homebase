@@ -3,7 +3,12 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"log"
+	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 
 	"homeserver/config"
@@ -12,6 +17,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type subdomainRecord struct {
+	IsPublic     bool
+	IsActive     bool
+	Type         string
+	ProxyURL     string
+	PasswordHash string
+}
+
 func SubdomainHandler(sitesDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
@@ -19,36 +32,33 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 			host = host[:idx]
 		}
 
-		// root domain → serve portfolio
-		if host == config.C.RootDomain {
+		// root domain → portfolio
+		if host == config.C.RootDomain || host == "" {
 			http.FileServer(http.Dir(sitesDir+"/root")).ServeHTTP(w, r)
 			return
 		}
 
-		// extract subdomain name
 		parts := strings.SplitN(host, ".", 2)
 		if len(parts) < 2 {
-			http.NotFound(w, r)
+			http.FileServer(http.Dir(sitesDir+"/root")).ServeHTTP(w, r)
 			return
 		}
 		name := parts[0]
 
-		// admin subdomain → serve React SPA (all paths fall back to index.html)
+		// admin → React SPA
 		if name == "admin" {
 			serveReactApp(sitesDir+"/admin", w, r)
 			return
 		}
 
-		// look up subdomain in DB
-		var isPublic bool
-		var passwordHash string
-		var isActive bool
-		err := db.DB.QueryRow(
-			"SELECT is_public, COALESCE(password_hash, ''), is_active FROM subdomains WHERE name = ?", name,
-		).Scan(&isPublic, &passwordHash, &isActive)
+		// look up subdomain
+		var rec subdomainRecord
+		err := db.DB.QueryRow(`
+			SELECT is_public, is_active, COALESCE(type,'static'), COALESCE(proxy_url,''), COALESCE(password_hash,'')
+			FROM subdomains WHERE name = ?`, name,
+		).Scan(&rec.IsPublic, &rec.IsActive, &rec.Type, &rec.ProxyURL, &rec.PasswordHash)
 
-		if err == sql.ErrNoRows || !isActive {
-			// fallback to portfolio for unknown hosts
+		if err == sql.ErrNoRows || !rec.IsActive {
 			http.FileServer(http.Dir(sitesDir+"/root")).ServeHTTP(w, r)
 			return
 		}
@@ -57,19 +67,82 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 			return
 		}
 
-		if !isPublic {
-			if !checkPrivateAccess(w, r, passwordHash) {
+		if !rec.IsPublic {
+			if !checkPrivateAccess(w, r, rec.PasswordHash) {
 				return
 			}
 		}
 
-		http.FileServer(http.Dir(fmt.Sprintf("%s/%s", sitesDir, name))).ServeHTTP(w, r)
+		switch rec.Type {
+		case "proxy":
+			proxyTo(rec.ProxyURL, w, r)
+		default:
+			http.FileServer(http.Dir(fmt.Sprintf("%s/%s", sitesDir, name))).ServeHTTP(w, r)
+		}
 	}
 }
 
+func proxyTo(target string, w http.ResponseWriter, r *http.Request) {
+	u, err := url.Parse(target)
+	if err != nil {
+		http.Error(w, "invalid proxy target", http.StatusInternalServerError)
+		return
+	}
+
+	// WebSocket — raw TCP tunnel
+	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		proxyWebSocket(u, w, r)
+		return
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(u)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		log.Printf("proxy error for %s: %v", target, err)
+		http.Error(w, "upstream unavailable", http.StatusBadGateway)
+	}
+	r.Host = u.Host
+	proxy.ServeHTTP(w, r)
+}
+
+func proxyWebSocket(target *url.URL, w http.ResponseWriter, r *http.Request) {
+	addr := target.Host
+	if target.Port() == "" {
+		if target.Scheme == "https" {
+			addr += ":443"
+		} else {
+			addr += ":80"
+		}
+	}
+
+	upstream, err := net.Dial("tcp", addr)
+	if err != nil {
+		http.Error(w, "upstream unavailable", http.StatusBadGateway)
+		return
+	}
+	defer upstream.Close()
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "websocket not supported", http.StatusInternalServerError)
+		return
+	}
+	client, _, err := hj.Hijack()
+	if err != nil {
+		return
+	}
+	defer client.Close()
+
+	// forward original HTTP upgrade request to upstream
+	r.Write(upstream)
+
+	// bidirectional pipe
+	done := make(chan struct{}, 2)
+	go func() { io.Copy(upstream, client); done <- struct{}{} }()
+	go func() { io.Copy(client, upstream); done <- struct{}{} }()
+	<-done
+}
+
 func serveReactApp(dir string, w http.ResponseWriter, r *http.Request) {
-	// serve static assets (js, css, images) directly
-	// for all other paths serve index.html so React Router handles routing
 	fs := http.Dir(dir)
 	if r.URL.Path != "/" {
 		f, err := fs.Open(r.URL.Path)

@@ -6,6 +6,8 @@ export default function Subdomains() {
   const [subs, setSubs] = useState([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('static')
+  const [newProxyURL, setNewProxyURL] = useState('')
   const [creating, setCreating] = useState(false)
   const [privacyModal, setPrivacyModal] = useState(null)
 
@@ -21,8 +23,16 @@ export default function Subdomains() {
     e.preventDefault()
     if (!newName.trim()) return
     setCreating(true)
-    await api.createSubdomain({ name: newName.trim(), is_public: false, rate_limit: 100 })
+    await api.createSubdomain({
+      name: newName.trim(),
+      type: newType,
+      proxy_url: newType === 'proxy' ? newProxyURL.trim() : '',
+      is_public: false,
+      rate_limit: 100,
+    })
     setNewName('')
+    setNewProxyURL('')
+    setNewType('static')
     setCreating(false)
     load()
   }
@@ -48,19 +58,35 @@ export default function Subdomains() {
     <div>
       <div className="subdomains-header">
         <h1 className="page-title">Subdomains</h1>
-        <form className="create-form" onSubmit={create}>
+      </div>
+
+      <form className="create-form card" onSubmit={create}>
+        <div className="create-row">
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
-            placeholder="new-subdomain"
+            placeholder="subdomain-name"
             pattern="[a-z0-9\-]+"
             title="Lowercase letters, numbers, hyphens only"
+            required
           />
+          <select value={newType} onChange={e => setNewType(e.target.value)}>
+            <option value="static">Static files</option>
+            <option value="proxy">Proxy (app)</option>
+          </select>
+          {newType === 'proxy' && (
+            <input
+              value={newProxyURL}
+              onChange={e => setNewProxyURL(e.target.value)}
+              placeholder="http://localhost:9001"
+              required
+            />
+          )}
           <button type="submit" className="btn-primary" disabled={creating}>Add</button>
-        </form>
-      </div>
+        </div>
+      </form>
 
-      <div className="card">
+      <div className="card" style={{ marginTop: '1rem' }}>
         {subs.length === 0 ? (
           <p className="muted">No subdomains yet. Drop a folder in sites/ or add one above.</p>
         ) : (
@@ -68,6 +94,7 @@ export default function Subdomains() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Type</th>
                 <th>Domain</th>
                 <th>Active</th>
                 <th>Visibility</th>
@@ -79,6 +106,11 @@ export default function Subdomains() {
               {subs.map(s => (
                 <tr key={s.id}>
                   <td><strong>{s.name}</strong></td>
+                  <td>
+                    <span className={`badge ${s.type === 'proxy' ? 'badge-yellow' : 'badge-gray'}`}>
+                      {s.type === 'proxy' ? `proxy → ${s.proxy_url}` : 'static'}
+                    </span>
+                  </td>
                   <td><span className="mono">{s.full_domain}</span></td>
                   <td>
                     <Toggle checked={s.is_active} onChange={() => toggleActive(s)} />

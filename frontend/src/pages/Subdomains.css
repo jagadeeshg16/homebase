@@ -7,8 +7,14 @@
 .subdomains-header .page-title { margin-bottom: 0; }
 
 .create-form {
+  margin-bottom: 0;
+}
+
+.create-row {
   display: flex;
   gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .mono {

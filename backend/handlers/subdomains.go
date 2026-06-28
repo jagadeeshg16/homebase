@@ -23,6 +23,8 @@ type Subdomain struct {
 	ID         int       `json:"id"`
 	Name       string    `json:"name"`
 	FullDomain string    `json:"full_domain"`
+	Type       string    `json:"type"`
+	ProxyURL   string    `json:"proxy_url"`
 	IsPublic   bool      `json:"is_public"`
 	IsActive   bool      `json:"is_active"`
 	RateLimit  int       `json:"rate_limit"`
@@ -31,7 +33,7 @@ type Subdomain struct {
 }
 
 func ListSubdomains(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`SELECT id, name, full_domain, is_public, rate_limit, is_active, created_at, updated_at FROM subdomains ORDER BY created_at DESC`)
+	rows, err := db.DB.Query(`SELECT id, name, full_domain, COALESCE(type,'static'), COALESCE(proxy_url,''), is_public, rate_limit, is_active, created_at, updated_at FROM subdomains ORDER BY created_at DESC`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -41,7 +43,7 @@ func ListSubdomains(w http.ResponseWriter, r *http.Request) {
 	var subs []Subdomain
 	for rows.Next() {
 		var s Subdomain
-		rows.Scan(&s.ID, &s.Name, &s.FullDomain, &s.IsPublic, &s.RateLimit, &s.IsActive, &s.CreatedAt, &s.UpdatedAt)
+		rows.Scan(&s.ID, &s.Name, &s.FullDomain, &s.Type, &s.ProxyURL, &s.IsPublic, &s.RateLimit, &s.IsActive, &s.CreatedAt, &s.UpdatedAt)
 		subs = append(subs, s)
 	}
 	if subs == nil {
@@ -54,6 +56,8 @@ func ListSubdomains(w http.ResponseWriter, r *http.Request) {
 func CreateSubdomain(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name      string `json:"name"`
+		Type      string `json:"type"`
+		ProxyURL  string `json:"proxy_url"`
 		IsPublic  bool   `json:"is_public"`
 		RateLimit int    `json:"rate_limit"`
 	}
@@ -66,12 +70,15 @@ func CreateSubdomain(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name required", http.StatusBadRequest)
 		return
 	}
+	if req.Type == "" {
+		req.Type = "static"
+	}
 	fullDomain := req.Name + "." + config.C.RootDomain
 
 	// insert as active (manual creation by admin = intentional)
 	_, err := db.DB.Exec(
-		`INSERT INTO subdomains (name, full_domain, is_public, is_active, rate_limit) VALUES (?, ?, ?, 1, ?)`,
-		req.Name, fullDomain, req.IsPublic, req.RateLimit,
+		`INSERT INTO subdomains (name, full_domain, type, proxy_url, is_public, is_active, rate_limit) VALUES (?, ?, ?, ?, ?, 1, ?)`,
+		req.Name, fullDomain, req.Type, req.ProxyURL, req.IsPublic, req.RateLimit,
 	)
 	if err != nil {
 		http.Error(w, "subdomain already exists: "+err.Error(), http.StatusConflict)

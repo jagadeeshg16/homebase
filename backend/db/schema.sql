@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS subdomains (
     id            INTEGER PRIMARY KEY,
     name          TEXT UNIQUE NOT NULL,
     full_domain   TEXT NOT NULL,
+    type          TEXT DEFAULT 'static',  -- 'static' or 'proxy'
+    proxy_url     TEXT,                   -- e.g. http://localhost:9001 (for proxy type)
     is_public     BOOLEAN DEFAULT 1,
     password_hash TEXT,
     rate_limit    INTEGER DEFAULT 100,
@@ -16,6 +18,7 @@ CREATE TABLE IF NOT EXISTS subdomains (
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE IF NOT EXISTS health_logs (
     id           INTEGER PRIMARY KEY,
