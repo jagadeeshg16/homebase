@@ -33,9 +33,9 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 		}
 		name := parts[0]
 
-		// admin subdomain → serve admin dashboard
+		// admin subdomain → serve React SPA (all paths fall back to index.html)
 		if name == "admin" {
-			http.FileServer(http.Dir(sitesDir+"/admin")).ServeHTTP(w, r)
+			serveReactApp(sitesDir+"/admin", w, r)
 			return
 		}
 
@@ -65,6 +65,21 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 
 		http.FileServer(http.Dir(fmt.Sprintf("%s/%s", sitesDir, name))).ServeHTTP(w, r)
 	}
+}
+
+func serveReactApp(dir string, w http.ResponseWriter, r *http.Request) {
+	// serve static assets (js, css, images) directly
+	// for all other paths serve index.html so React Router handles routing
+	fs := http.Dir(dir)
+	if r.URL.Path != "/" {
+		f, err := fs.Open(r.URL.Path)
+		if err == nil {
+			f.Close()
+			http.FileServer(fs).ServeHTTP(w, r)
+			return
+		}
+	}
+	http.ServeFile(w, r, dir+"/index.html")
 }
 
 func checkPrivateAccess(w http.ResponseWriter, r *http.Request, hash string) bool {
