@@ -13,8 +13,6 @@ import (
 
 	"homeserver/config"
 	"homeserver/db"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type subdomainRecord struct {
@@ -68,7 +66,9 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 		}
 
 		if !rec.IsPublic {
-			if !checkPrivateAccess(w, r, rec.PasswordHash) {
+			// admin session → bypass private check
+			if !isAdminSession(r) {
+				http.NotFound(w, r)
 				return
 			}
 		}
@@ -142,6 +142,11 @@ func proxyWebSocket(target *url.URL, w http.ResponseWriter, r *http.Request) {
 	<-done
 }
 
+func isAdminSession(r *http.Request) bool {
+	cookie, err := r.Cookie("session")
+	return err == nil && cookie.Value == config.C.SessionSecret
+}
+
 func serveReactApp(dir string, w http.ResponseWriter, r *http.Request) {
 	fs := http.Dir(dir)
 	if r.URL.Path != "/" {
@@ -155,44 +160,3 @@ func serveReactApp(dir string, w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, dir+"/index.html")
 }
 
-func checkPrivateAccess(w http.ResponseWriter, r *http.Request, hash string) bool {
-	cookie, err := r.Cookie("subdomain_auth")
-	if err == nil && bcrypt.CompareHashAndPassword([]byte(hash), []byte(cookie.Value)) == nil {
-		return true
-	}
-
-	if r.Method == http.MethodPost {
-		password := r.FormValue("password")
-		if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
-			http.SetCookie(w, &http.Cookie{
-				Name:     "subdomain_auth",
-				Value:    password,
-				Path:     "/",
-				HttpOnly: true,
-			})
-			http.Redirect(w, r, r.URL.Path, http.StatusSeeOther)
-			return false
-		}
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprint(w, passwordPromptHTML)
-	return false
-}
-
-const passwordPromptHTML = `<!DOCTYPE html>
-<html>
-<head><title>Private</title><style>
-body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f5f5f5}
-form{background:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;flex-direction:column;gap:1rem;min-width:280px}
-input{padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:1rem}
-button{padding:0.5rem;background:#333;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1rem}
-</style></head>
-<body>
-<form method="POST">
-  <h2 style="margin:0">Private Page</h2>
-  <input type="password" name="password" placeholder="Password" autofocus required>
-  <button type="submit">Enter</button>
-</form>
-</body>
-</html>`
