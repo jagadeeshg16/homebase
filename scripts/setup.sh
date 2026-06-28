@@ -1,8 +1,16 @@
 #!/bin/bash
 # homebase setup — run once on a fresh machine
-# Usage: ./scripts/setup.sh
+# Works from any directory: bash ~/server/scripts/setup.sh
 
 set -euo pipefail
+
+# Resolve project root regardless of where this script is called from
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "==> homebase setup"
+echo "    Project root: $PROJECT_ROOT"
+echo ""
 
 echo "==> Installing dependencies..."
 
@@ -14,7 +22,7 @@ if ! command -v caddy &>/dev/null; then
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
     sudo apt-get update && sudo apt-get install -y caddy
 else
-    echo "  Caddy already installed: $(caddy version)"
+    echo "  Caddy: $(caddy version)"
 fi
 
 # Go
@@ -28,71 +36,66 @@ if ! command -v go &>/dev/null; then
     echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
     export PATH=$PATH:/usr/local/go/bin
 else
-    echo "  Go already installed: $(go version)"
+    echo "  Go: $(go version)"
 fi
 
 # Python bcrypt
 echo "  Installing Python bcrypt..."
 pip3 install bcrypt --break-system-packages 2>/dev/null || pip3 install bcrypt
 
-# Node.js (for frontend build)
+# Node.js
 if ! command -v node &>/dev/null; then
     echo "  Installing Node.js..."
     curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
     sudo apt-get install -y nodejs
 else
-    echo "  Node already installed: $(node --version)"
+    echo "  Node: $(node --version)"
 fi
 
 echo ""
 echo "==> Building backend..."
-cd "$(dirname "$0")/../backend"
+cd "$PROJECT_ROOT/backend"
 go build -o homeserver .
-echo "  Backend built."
+echo "  Done."
 
 echo ""
 echo "==> Building frontend..."
-cd "$(dirname "$0")/../frontend"
+cd "$PROJECT_ROOT/frontend"
 npm install && npm run build
-echo "  Frontend built."
+echo "  Done."
 
 echo ""
 echo "==> Setting up .env..."
-ENV_FILE="$(dirname "$0")/../.env"
+ENV_FILE="$PROJECT_ROOT/.env"
 if [ ! -f "$ENV_FILE" ]; then
-    cp "$(dirname "$0")/../.env.example" "$ENV_FILE"
-
-    # generate random secrets
+    cp "$PROJECT_ROOT/.env.example" "$ENV_FILE"
     INTERNAL_TOKEN=$(python3 -c "import secrets; print(secrets.token_hex(32))")
     SESSION_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-
     sed -i "s/INTERNAL_TOKEN=.*/INTERNAL_TOKEN=$INTERNAL_TOKEN/" "$ENV_FILE"
     sed -i "s/SESSION_SECRET=.*/SESSION_SECRET=$SESSION_SECRET/" "$ENV_FILE"
-
     echo "  .env created with random secrets."
-    echo "  Edit ~/server/.env to add your domain and DNS API keys."
 else
     echo "  .env already exists, skipping."
 fi
 
 echo ""
 echo "==> Creating data directory..."
-mkdir -p "$(dirname "$0")/../data"
+mkdir -p "$PROJECT_ROOT/data"
 
 echo ""
 echo "==> Done! Next steps:"
 echo ""
 echo "  1. Fill in your domain and DNS keys:"
-echo "     nano ~/server/.env"
+echo "     nano $PROJECT_ROOT/.env"
 echo ""
 echo "  2. Create admin user:"
-echo "     ~/server/scripts/create-admin.sh jagadeesh yourpassword"
+echo "     $PROJECT_ROOT/scripts/create-admin.sh jagadeesh yourpassword"
 echo ""
 echo "  3. Start the server:"
-echo "     ~/server/backend/homeserver"
+echo "     $PROJECT_ROOT/backend/homeserver"
 echo ""
 echo "  4. Start Caddy:"
-echo "     caddy run --config ~/server/caddy/Caddyfile"
+echo "     caddy run --config $PROJECT_ROOT/caddy/Caddyfile"
 echo ""
 echo "  5. Add DDNS to cron (crontab -e):"
-echo "     */5 * * * * INTERNAL_TOKEN=\$(grep INTERNAL_TOKEN ~/server/.env | cut -d= -f2) ~/server/scripts/ddns.sh"
+echo "     */5 * * * * INTERNAL_TOKEN=\$(grep INTERNAL_TOKEN $PROJECT_ROOT/.env | cut -d= -f2) $PROJECT_ROOT/scripts/ddns.sh"
