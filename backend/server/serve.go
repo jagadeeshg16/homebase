@@ -100,8 +100,9 @@ func proxyTo(target string, w http.ResponseWriter, r *http.Request) {
 		log.Printf("proxy error for %s: %v", target, err)
 		http.Error(w, "upstream unavailable", http.StatusBadGateway)
 	}
-	r.Host = u.Host
-	proxy.ServeHTTP(w, r)
+	outReq := r.Clone(r.Context())
+	outReq.Host = u.Host
+	proxy.ServeHTTP(w, outReq)
 }
 
 func proxyWebSocket(target *url.URL, w http.ResponseWriter, r *http.Request) {
