@@ -6,22 +6,26 @@ import (
 	"net/http"
 	"strings"
 
+	"homeserver/config"
 	"homeserver/db"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-const sitesRoot = "/home/%s/server/sites"
-
 func SubdomainHandler(sitesDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
-		// strip port if present
 		if idx := strings.Index(host, ":"); idx != -1 {
 			host = host[:idx]
 		}
 
-		// extract subdomain
+		// root domain → serve portfolio
+		if host == config.C.RootDomain {
+			http.FileServer(http.Dir(sitesDir+"/root")).ServeHTTP(w, r)
+			return
+		}
+
+		// extract subdomain name
 		parts := strings.SplitN(host, ".", 2)
 		if len(parts) < 2 {
 			http.NotFound(w, r)
@@ -29,6 +33,13 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 		}
 		name := parts[0]
 
+		// admin subdomain → serve admin dashboard
+		if name == "admin" {
+			http.FileServer(http.Dir(sitesDir+"/admin")).ServeHTTP(w, r)
+			return
+		}
+
+		// look up subdomain in DB
 		var isPublic bool
 		var passwordHash string
 		var isActive bool
@@ -51,8 +62,7 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 			}
 		}
 
-		dir := fmt.Sprintf("%s/%s", sitesDir, name)
-		http.FileServer(http.Dir(dir)).ServeHTTP(w, r)
+		http.FileServer(http.Dir(fmt.Sprintf("%s/%s", sitesDir, name))).ServeHTTP(w, r)
 	}
 }
 
