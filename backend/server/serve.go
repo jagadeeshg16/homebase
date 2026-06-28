@@ -75,9 +75,11 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 
 		switch rec.Type {
 		case "proxy":
-			// browser implicit form submit (password field + button) sends POST /
-			// redirect to GET so the upstream app receives a normal page load
-			if r.Method == http.MethodPost && r.URL.Path == "/" {
+			// browser password autofill submits an implicit form as POST /
+			// (only form submissions use application/x-www-form-urlencoded)
+			// real API POSTs use application/json or multipart — let those through
+			if r.Method == http.MethodPost && r.URL.Path == "/" &&
+				strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
 				http.Redirect(w, r, "/", http.StatusSeeOther)
 				return
 			}
