@@ -37,13 +37,10 @@ export default function Subdomains() {
     load()
   }
 
-  async function remove(id, name) {
-    if (!window.confirm(`Delete subdomain "${name}"?`)) return
+  async function remove(id) {
     const res = await api.deleteSubdomain(id)
     if (res && (res.ok || res.status === 204)) {
       load()
-    } else {
-      alert('Delete failed — check backend logs.')
     }
   }
 
@@ -137,7 +134,7 @@ export default function Subdomains() {
                     />
                   </td>
                   <td>
-                    <button className="btn-danger" onClick={() => remove(s.id, s.name)}>Delete</button>
+                    <button className="btn-danger" onClick={() => remove(s.id)}>Delete</button>
                   </td>
                 </tr>
               ))}

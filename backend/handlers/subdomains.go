@@ -104,18 +104,28 @@ func CreateSubdomain(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteSubdomain(w http.ResponseWriter, r *http.Request) {
+	log.Printf("DELETE subdomain: method=%s path=%s", r.Method, r.URL.Path)
 	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
 	idStr := parts[len(parts)-1]
+	log.Printf("DELETE subdomain: parsed id string=%q", idStr)
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Printf("DELETE subdomain: invalid id %q: %v", idStr, err)
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
 	var name string
 	db.DB.QueryRow("SELECT name FROM subdomains WHERE id = ?", id).Scan(&name)
+	log.Printf("DELETE subdomain: id=%d name=%q", id, name)
 
-	db.DB.Exec("DELETE FROM subdomains WHERE id = ?", id)
+	res, err := db.DB.Exec("DELETE FROM subdomains WHERE id = ?", id)
+	if err != nil {
+		log.Printf("DELETE subdomain: db error: %v", err)
+	} else {
+		n, _ := res.RowsAffected()
+		log.Printf("DELETE subdomain: rows affected=%d", n)
+	}
 
 	// delete DNS record via tracked event
 	if DNSProvider != nil && name != "" && config.C.RootDomain != "" {
