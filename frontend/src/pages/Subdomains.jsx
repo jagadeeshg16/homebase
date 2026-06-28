@@ -1,0 +1,171 @@
+import { useEffect, useState } from 'react'
+import { api } from '../lib/api'
+import './Subdomains.css'
+
+export default function Subdomains() {
+  const [subs, setSubs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [privacyModal, setPrivacyModal] = useState(null)
+
+  async function load() {
+    const data = await api.subdomains()
+    setSubs(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function create(e) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setCreating(true)
+    await api.createSubdomain({ name: newName.trim(), is_public: false, rate_limit: 100 })
+    setNewName('')
+    setCreating(false)
+    load()
+  }
+
+  async function remove(id) {
+    if (!confirm('Delete this subdomain?')) return
+    await api.deleteSubdomain(id)
+    load()
+  }
+
+  async function toggleActive(s) {
+    await api.updatePrivacy(s.id, { is_public: s.is_public, is_active: !s.is_active })
+    load()
+  }
+
+  async function updateRL(id, value) {
+    await api.updateRateLimit(id, { rate_limit: parseInt(value) || 0 })
+  }
+
+  if (loading) return <p className="muted">Loading…</p>
+
+  return (
+    <div>
+      <div className="subdomains-header">
+        <h1 className="page-title">Subdomains</h1>
+        <form className="create-form" onSubmit={create}>
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="new-subdomain"
+            pattern="[a-z0-9\-]+"
+            title="Lowercase letters, numbers, hyphens only"
+          />
+          <button type="submit" className="btn-primary" disabled={creating}>Add</button>
+        </form>
+      </div>
+
+      <div className="card">
+        {subs.length === 0 ? (
+          <p className="muted">No subdomains yet. Drop a folder in sites/ or add one above.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Domain</th>
+                <th>Active</th>
+                <th>Visibility</th>
+                <th>Rate limit (rpm)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {subs.map(s => (
+                <tr key={s.id}>
+                  <td><strong>{s.name}</strong></td>
+                  <td><span className="mono">{s.full_domain}</span></td>
+                  <td>
+                    <Toggle checked={s.is_active} onChange={() => toggleActive(s)} />
+                  </td>
+                  <td>
+                    <button
+                      className={`badge-btn ${s.is_public ? 'badge-green' : 'badge-yellow'}`}
+                      onClick={() => setPrivacyModal(s)}
+                    >
+                      {s.is_public ? 'Public' : 'Private'}
+                    </button>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      defaultValue={s.rate_limit}
+                      min="0"
+                      style={{ width: 80 }}
+                      onBlur={e => updateRL(s.id, e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <button className="btn-danger" onClick={() => remove(s.id)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {privacyModal && (
+        <PrivacyModal
+          sub={privacyModal}
+          onClose={() => setPrivacyModal(null)}
+          onSave={async (isPublic, password) => {
+            await api.updatePrivacy(privacyModal.id, { is_public: isPublic, password })
+            setPrivacyModal(null)
+            load()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function Toggle({ checked, onChange }) {
+  return (
+    <label className="toggle">
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      <span className="toggle-track" />
+    </label>
+  )
+}
+
+function PrivacyModal({ sub, onClose, onSave }) {
+  const [isPublic, setIsPublic] = useState(sub.is_public)
+  const [password, setPassword] = useState('')
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h2>Privacy — {sub.name}</h2>
+        <div className="modal-options">
+          <label className={`option ${isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(true)}>
+            <strong>Public</strong>
+            <span>Anyone can access</span>
+          </label>
+          <label className={`option ${!isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(false)}>
+            <strong>Private</strong>
+            <span>Password protected</span>
+          </label>
+        </div>
+        {!isPublic && (
+          <input
+            type="password"
+            placeholder="New password (leave blank to keep current)"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            style={{ width: '100%', marginTop: 12 }}
+          />
+        )}
+        <div className="modal-actions">
+          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={() => onSave(isPublic, password)}>Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,13 @@
+jagadeeshg.in {
+    root * /home/{$USER}/server/sites/root
+    file_server
+    encode gzip
+}
+
+admin.jagadeeshg.in {
+    reverse_proxy localhost:8080
+}
+
+*.jagadeeshg.in {
+    reverse_proxy localhost:8080
+}

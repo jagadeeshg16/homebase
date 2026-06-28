@@ -1,0 +1,19 @@
+.dns-card { display: flex; flex-direction: column; gap: 16px; }
+
+.dns-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.dns-row:last-of-type { border-bottom: none; padding-bottom: 0; }
+
+.dns-label { color: var(--muted); font-size: 13px; }
+.dns-value { font-weight: 600; }
+.mono { font-family: monospace; }
+
+.msg-ok  { color: var(--success); font-size: 13px; }
+.msg-err { color: var(--danger);  font-size: 13px; }
+
+.hint { color: var(--muted); font-size: 12px; line-height: 1.6; }

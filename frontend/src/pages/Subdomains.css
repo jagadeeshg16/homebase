@@ -1,0 +1,97 @@
+.subdomains-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.subdomains-header .page-title { margin-bottom: 0; }
+
+.create-form {
+  display: flex;
+  gap: 8px;
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.badge-btn {
+  border: none;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 3px 10px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+.badge-btn.badge-green  { background: #1a3a2a; color: var(--success); }
+.badge-btn.badge-yellow { background: #3a2a1a; color: var(--warn); }
+
+/* Toggle switch */
+.toggle { position: relative; display: inline-block; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track {
+  display: block;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 999px;
+  transition: background 0.2s;
+  position: relative;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.modal h2 { font-size: 1rem; font-weight: 600; }
+.modal-options { display: flex; gap: 8px; }
+.option {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s;
+}
+.option strong { font-size: 13px; }
+.option span { font-size: 11px; color: var(--muted); }
+.option.selected { border-color: var(--accent); background: #1e2a3a; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.muted { color: var(--muted); padding: 1rem 0; }
