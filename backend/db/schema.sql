@@ -36,3 +36,15 @@ CREATE TABLE IF NOT EXISTS dns_log (
     success   BOOLEAN,
     logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS dns_events (
+    id          INTEGER PRIMARY KEY,
+    subdomain   TEXT NOT NULL,
+    operation   TEXT NOT NULL,  -- 'create' | 'delete' | 'update'
+    status      TEXT NOT NULL,  -- 'pending' | 'success' | 'failed'
+    error_msg   TEXT,
+    attempts    INTEGER DEFAULT 0,
+    next_retry  DATETIME,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);

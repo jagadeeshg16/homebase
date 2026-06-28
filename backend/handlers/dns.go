@@ -34,7 +34,7 @@ func UpdateDNS(w http.ResponseWriter, r *http.Request) {
 
 	success := true
 	for name := range targets {
-		if err := DNSProvider.UpsertARecord(config.C.RootDomain, name, req.IP, 300); err != nil {
+		if err := DNSProvider.UpsertARecord(config.C.RootDomain, name, req.IP, 600); err != nil {
 			log.Printf("dns update failed for %s: %v", name, err)
 			success = false
 		}

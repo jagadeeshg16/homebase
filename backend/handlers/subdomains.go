@@ -94,14 +94,10 @@ func CreateSubdomain(w http.ResponseWriter, r *http.Request) {
 		os.WriteFile(sitesDir+"/index.html", []byte(placeholder), 0644)
 	}
 
-	// create DNS A record
+	// create DNS A record via tracked event
 	if DNSProvider != nil && config.C.RootDomain != "" {
-		ip := currentIP()
-		if ip != "" {
-			if err := DNSProvider.UpsertARecord(config.C.RootDomain, req.Name, ip, 300); err != nil {
-				log.Printf("dns create failed for %s: %v", req.Name, err)
-			}
-		}
+		eventID := LogDNSEvent(req.Name, "create")
+		go executeDNSEvent(eventID, req.Name, "create", 0)
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -120,11 +116,10 @@ func DeleteSubdomain(w http.ResponseWriter, r *http.Request) {
 
 	db.DB.Exec("DELETE FROM subdomains WHERE id = ?", id)
 
-	// delete DNS record
+	// delete DNS record via tracked event
 	if DNSProvider != nil && name != "" && config.C.RootDomain != "" {
-		if err := DNSProvider.DeleteRecord(config.C.RootDomain, name); err != nil {
-			log.Printf("dns delete failed for %s: %v", name, err)
-		}
+		eventID := LogDNSEvent(name, "delete")
+		go executeDNSEvent(eventID, name, "delete", 0)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -161,14 +156,10 @@ func UpdatePrivacy(w http.ResponseWriter, r *http.Request) {
 			"UPDATE subdomains SET is_public = ?, is_active = ?, password_hash = CASE WHEN ? != '' THEN ? ELSE password_hash END, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 			req.IsPublic, *req.IsActive, hash, hash, id,
 		)
-		// if activating for the first time, create DNS record
+		// if activating for the first time, create DNS record via tracked event
 		if *req.IsActive && !wasActive && DNSProvider != nil && config.C.RootDomain != "" {
-			ip := currentIP()
-			if ip != "" {
-				if err := DNSProvider.UpsertARecord(config.C.RootDomain, name, ip, 300); err != nil {
-					log.Printf("dns activate failed for %s: %v", name, err)
-				}
-			}
+			eventID := LogDNSEvent(name, "create")
+			go executeDNSEvent(eventID, name, "create", 0)
 		}
 	} else {
 		db.DB.Exec(

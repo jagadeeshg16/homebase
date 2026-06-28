@@ -65,6 +65,8 @@ func main() {
 	protected.HandleFunc("/api/health", handlers.GetHealth)
 	protected.HandleFunc("/api/health/", handlers.GetSubdomainHealth)
 	protected.HandleFunc("/api/settings/password", handlers.ChangePassword)
+	protected.HandleFunc("/api/dns/events", handlers.GetDNSEvents)
+	protected.HandleFunc("/api/dns/retry/", handlers.RetryDNSEvent)
 
 	mux.Handle("/api/", middleware.Auth(protected))
 
@@ -73,6 +75,9 @@ func main() {
 
 	// Watch sites/ dir — auto-register new folders as private+inactive
 	server.WatchSites(sitesDir)
+
+	// DNS retry worker — retries failed DNS events with exponential backoff
+	handlers.StartDNSRetryWorker()
 
 	// Health check goroutine — runs every 60s
 	go func() {
