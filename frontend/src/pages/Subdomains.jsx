@@ -39,8 +39,8 @@ export default function Subdomains() {
 
   async function remove(id) {
     const res = await api.deleteSubdomain(id)
-    if (res && (res.ok || res.status === 204)) {
-      load()
+    if (res && res.ok) {
+      setSubs(prev => prev.filter(s => s.id !== id))
     }
   }
 
