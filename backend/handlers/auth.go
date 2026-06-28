@@ -44,6 +44,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    config.C.SessionSecret,
 		Path:     "/",
+		Domain:   "." + config.C.RootDomain,
 		HttpOnly: true,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})

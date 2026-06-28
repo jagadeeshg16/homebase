@@ -89,7 +89,7 @@ func main() {
 
 	addr := ":" + config.C.Port
 	log.Println("server starting on", addr)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	log.Fatal(http.ListenAndServe(addr, middleware.Logger(mux)))
 }
 
 func newDNSProvider() dnspkg.Provider {
