@@ -73,26 +73,32 @@ func GetSubdomainHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func RunHealthChecks() {
-	rows, err := db.DB.Query("SELECT id, full_domain FROM subdomains WHERE is_active = 1")
+	rows, err := db.DB.Query("SELECT id, full_domain, COALESCE(type,'static'), COALESCE(proxy_url,'') FROM subdomains WHERE is_active = 1")
 	if err != nil {
 		return
 	}
 	defer rows.Close()
 
 	type sub struct {
-		ID     int
-		Domain string
+		ID       int
+		Domain   string
+		Type     string
+		ProxyURL string
 	}
 	var subs []sub
 	for rows.Next() {
 		var s sub
-		rows.Scan(&s.ID, &s.Domain)
+		rows.Scan(&s.ID, &s.Domain, &s.Type, &s.ProxyURL)
 		subs = append(subs, s)
 	}
 
 	for _, s := range subs {
+		target := fmt.Sprintf("http://%s", s.Domain)
+		if s.Type == "proxy" && s.ProxyURL != "" {
+			target = s.ProxyURL
+		}
 		start := time.Now()
-		resp, err := http.Get(fmt.Sprintf("http://%s", s.Domain))
+		resp, err := http.Get(target)
 		elapsed := int(time.Since(start).Milliseconds())
 		status := 0
 		if err == nil {
