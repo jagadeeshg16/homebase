@@ -48,7 +48,8 @@ func SubdomainHandler(sitesDir string) http.HandlerFunc {
 		).Scan(&isPublic, &passwordHash, &isActive)
 
 		if err == sql.ErrNoRows || !isActive {
-			http.NotFound(w, r)
+			// fallback to portfolio for unknown hosts
+			http.FileServer(http.Dir(sitesDir+"/root")).ServeHTTP(w, r)
 			return
 		}
 		if err != nil {
