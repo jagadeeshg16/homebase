@@ -94,8 +94,8 @@ func CreateSubdomain(w http.ResponseWriter, r *http.Request) {
 		os.WriteFile(sitesDir+"/index.html", []byte(placeholder), 0644)
 	}
 
-	// create DNS A record via tracked event
-	if DNSProvider != nil && config.C.RootDomain != "" {
+	// create DNS A record via tracked event (skip if using Cloudflare Tunnel — wildcard handles routing)
+	if DNSProvider != nil && config.C.RootDomain != "" && !config.C.UseTunnel {
 		eventID := LogDNSEvent(req.Name, "create")
 		go executeDNSEvent(eventID, req.Name, "create", 0)
 	}
@@ -131,8 +131,8 @@ func DeleteSubdomain(w http.ResponseWriter, r *http.Request) {
 	n, _ := res.RowsAffected()
 	log.Printf("DELETE subdomain: rows affected=%d", n)
 
-	// delete DNS record via tracked event
-	if DNSProvider != nil && name != "" && config.C.RootDomain != "" {
+	// delete DNS record via tracked event (skip if using Cloudflare Tunnel)
+	if DNSProvider != nil && name != "" && config.C.RootDomain != "" && !config.C.UseTunnel {
 		eventID := LogDNSEvent(name, "delete")
 		go executeDNSEvent(eventID, name, "delete", 0)
 	}

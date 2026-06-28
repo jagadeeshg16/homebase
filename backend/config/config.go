@@ -21,7 +21,8 @@ type Config struct {
 	CloudflareAPIToken string
 	CloudflareZoneID   string
 
-	DBPath string
+	DBPath    string
+	UseTunnel bool // skip per-subdomain DNS records; wildcard tunnel handles routing
 }
 
 var C Config
@@ -41,7 +42,8 @@ func Load() {
 		GoDaddyAPISecret:   getenv("GODADDY_API_SECRET", ""),
 		CloudflareAPIToken: getenv("CLOUDFLARE_API_TOKEN", ""),
 		CloudflareZoneID:   getenv("CLOUDFLARE_ZONE_ID", ""),
-		DBPath:             getenv("DB_PATH", "/home/"+os.Getenv("USER")+"/server/data/server.db"),
+		DBPath:    getenv("DB_PATH", "/home/"+os.Getenv("USER")+"/server/data/server.db"),
+		UseTunnel: getenv("USE_TUNNEL", "") == "true",
 	}
 }
 
